@@ -14,31 +14,43 @@ def print_slowly(text, delay): # 逐字输出，贴合deepseek等语言模型输
         index+=1
 # 使用client创建一个实例response，发送请求
 def chat_func(message,stream_judge):
-    response = client.chat.completions.create(
-        model = "deepseek-chat", # 选择的模型
-        messages = message,
-    stream = stream_judge # stream_judge用于控制是否采用流式输出
-)
+    try:
+        response = client.chat.completions.create(
+            model = "deepseek-chat", # 选择的模型
+            messages = message,
+            stream = stream_judge # stream_judge用于控制是否采用流式输出
+        )
     # 处理流式数据
-    if stream_judge:
-        for chunk in response:
-            if chunk.choices[0].delta.content: #chunk.choices[0].delta.content用于逐字获取并响应
-                content = chunk.choices[0].delta.content
-                print_slowly(content,0.01)
+        full_content = []
+        if stream_judge:
+            for chunk in response:
+                if chunk.choices[0].delta.content: #chunk.choices[0].delta.content用于逐字获取并响应
+                    content = chunk.choices[0].delta.content
+                    print_slowly(content,0.01)
+                    full_content.append(content)
 
-        message.append({"role" : "assistant", "content" : content})
-    else:
-        content = response.choices[0].message.content
-        print(f"DeepSeek:{content}")
+            message.append({"role" : "assistant", "content" : "".join(full_content)})
+        else:
+            content = response.choices[0].message.content
+            print(f"DeepSeek:{content}")
+            message.append({"role": "assistant", "content": content})
+
+    except Exception as e:
+        print(f"\n发生错误：{str(e)}")
+        message.pop()
+
 # 代码执行区
-stream_judge = input("是否采用流式输出,若使用请填True,否则为False: ")
-stream_judge = bool(stream_judge)
+stream_input = input("是否采用流式输出？(y/n): ").lower()
+stream_judge = stream_input in ['y', 'yes', 'true']
 message = [] # 用户输入放在循环外，若在循环内，无法保存上下文信息
-while(1):
-    user_input = input("请输入对话内容：")
-    message.append({"role" : "user" , "content" : user_input})
-    if user_input == "bye":
+while(True):
+    try:
+        user_input = input("\n用户：")
+        if user_input.lower() in ['exit', 'bye']:
+            break
+        message.append({"role" : "user" , "content" : user_input})
+        chat_func(message,stream_judge)
+    except KeyboardInterrupt:
+        print("\n对话已中断")
         break
-    chat_func(message,stream_judge)
-
     print("\n-----------------------------------------------------------------------------------")
